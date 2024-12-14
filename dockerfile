@@ -1,45 +1,44 @@
-FROM php:8.2-fpm
+# Usar una imagen base de PHP con soporte para Composer y Node
+FROM php:8.1-fpm
 
-# Instalar dependencias del sistema necesarias para Laravel y Node.js
+# Instalar dependencias del sistema para Composer y Node
 RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    libzip-dev \
-    unzip \
-    iputils-ping \
-    curl \
-    nodejs \
-    npm \
-    && docker-php-ext-install pdo_pgsql zip
+    libpng-dev libjpeg-dev libfreetype6-dev zip git curl \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd pdo pdo_pgsql
+
+# Instalar Node.js
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
+    apt-get install -y nodejs
 
 # Instalar Composer
-COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Configuración del directorio de trabajo
-WORKDIR /var/www
+# Copiar el código fuente a la imagen del contenedor
+COPY . /app/
 
-# Copiar los archivos del proyecto
-COPY . .
+# Establecer el directorio de trabajo
+WORKDIR /app
 
-# Instalar las dependencias de Composer (PHP)
-RUN echo "Instalando dependencias de Composer" && composer install --no-dev --optimize-autoloader
+# Instalar las dependencias de PHP con Composer
+RUN echo "Installing Composer dependencies..." && composer install --no-dev --optimize-autoloader
 
-# Instalar dependencias de NPM y construir assets
-RUN echo "Instalando dependencias de NPM" && npm install && echo "Dependencias de NPM instaladas"
-RUN echo "Construyendo assets con npm" && npm run build && echo "Assets construidos"
+# Instalar dependencias de Node.js y construir el proyecto
+RUN echo "Installing Node dependencies..." && npm install && npm run build
 
-# Ejecutar migraciones de la base de datos
-RUN echo "Ejecutando migraciones" && php artisan migrate --force && echo "Migraciones completadas"
+# Migrar la base de datos (asegúrate de que la base de datos sea accesible desde el contenedor)
+RUN echo "Running migrations..." && php artisan migrate --force
 
-# Optimizar el proyecto
-RUN echo "Optimizando el proyecto" && php artisan optimize && echo "Optimización completada"
+# Optimizar el proyecto (por ejemplo, cache de rutas, configuración, etc.)
+RUN echo "Optimizing application..." && php artisan optimize
 
-# Ajustar permisos de los directorios
-RUN echo "Ajustando permisos" && chmod 777 -R storage/ && chmod 777 -R bootstrap/cache
+# Establecer permisos adecuados para los directorios de Laravel
+RUN echo "Setting permissions..." && chmod -R 777 storage/ bootstrap/cache/
 
-# Crear el enlace simbólico para el almacenamiento
-RUN echo "Creando enlace simbólico de storage" && php artisan storage:link && echo "Enlace simbólico creado"
+# Crear el enlace simbólico para almacenamiento
+RUN echo "Creating storage symlink..." && php artisan storage:link
 
-# Exponer el puerto de PHP-FPM
+# Exponer el puerto 9000 para el contenedor
 EXPOSE 9000
 
 # Iniciar PHP-FPM
