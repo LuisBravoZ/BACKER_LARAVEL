@@ -1,4 +1,3 @@
-# Usar una imagen base de PHP con soporte para Composer y Node
 FROM php:8.1-fpm
 
 # Instalar dependencias del sistema para Composer y Node
@@ -14,14 +13,20 @@ RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
 # Instalar Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
+# Limpiar caché de Composer
+RUN composer clear-cache
+
 # Copiar el código fuente a la imagen del contenedor
 COPY . /app/
 
 # Establecer el directorio de trabajo
 WORKDIR /app
 
+# Verificar la versión de Composer
+RUN composer --version
+
 # Instalar las dependencias de PHP con Composer
-RUN echo "Installing Composer dependencies..." && composer install --no-dev --optimize-autoloader
+RUN echo "Installing Composer dependencies..." && composer install -vvv --no-dev --optimize-autoloader
 
 # Instalar dependencias de Node.js y construir el proyecto
 RUN echo "Installing Node dependencies..." && npm install && npm run build
@@ -29,7 +34,7 @@ RUN echo "Installing Node dependencies..." && npm install && npm run build
 # Migrar la base de datos (asegúrate de que la base de datos sea accesible desde el contenedor)
 RUN echo "Running migrations..." && php artisan migrate --force
 
-# Optimizar el proyecto (por ejemplo, cache de rutas, configuración, etc.)
+# Optimizar el proyecto
 RUN echo "Optimizing application..." && php artisan optimize
 
 # Establecer permisos adecuados para los directorios de Laravel
