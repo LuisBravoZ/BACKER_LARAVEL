@@ -8,6 +8,13 @@ services:
     volumes:
       - .:/var/www
       - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_HOST=dpg-cteb561u0jms7399bj7g-a.oregon-postgres.render.com
+      - DB_PORT=5432
+      - DB_DATABASE=bd_pgsql_backend_laravel
+      - DB_USERNAME=bd_pgsql_backend_laravel_user
+      - DB_PASSWORD=cYA3olBZoXuWQzMO0R8tTeG3qAUopGyu
     networks:
       - laravel
 
@@ -15,7 +22,7 @@ services:
     image: postgres:15
     container_name: laravel_dbBackend
     ports:
-      - "5433:5433"
+      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: tierrita24
