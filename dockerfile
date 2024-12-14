@@ -8,12 +8,12 @@ RUN apt-get update && apt-get install -y \
     iputils-ping \
     curl \
     git \
+    nodejs \
+    npm \
     && docker-php-ext-install pdo_pgsql zip
 
-# Instalar Node.js y Yarn
-RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g yarn
+# Instalar Yarn (si decides usar Yarn)
+RUN npm install -g yarn
 
 # Instalar Composer
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
@@ -27,9 +27,17 @@ COPY . .
 # Instalar dependencias de PHP
 RUN composer install --no-dev --optimize-autoloader
 
+# Instalar dependencias de Node usando Yarn
+RUN yarn install
+
+# Construir los assets de frontend usando Yarn
+RUN yarn build
+
+# Ejecutar migraciones y optimizar la aplicación
+RUN php artisan migrate --force && php artisan optimize
+
 # Ajustar permisos
-RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
-RUN chmod -R 775 storage bootstrap/cache
+RUN chmod -R 775 storage bootstrap/cache && php artisan storage:link
 
 # Exponer el puerto de PHP-FPM
 EXPOSE 9000
