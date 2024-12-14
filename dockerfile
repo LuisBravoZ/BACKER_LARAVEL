@@ -6,17 +6,15 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     unzip \
     iputils-ping \
-    curl \
-    git \
-    nodejs \
-    npm \
     && docker-php-ext-install pdo_pgsql zip
-
-# Instalar Yarn (si decides usar Yarn)
-RUN npm install -g yarn
 
 # Instalar Composer
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
+
+# Instalar Node.js y Yarn
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g yarn
 
 # Configuración del directorio de trabajo
 WORKDIR /var/www
@@ -25,19 +23,24 @@ WORKDIR /var/www
 COPY . .
 
 # Instalar dependencias de PHP
-RUN composer install --no-dev --optimize-autoloader
-
-# Instalar dependencias de Node usando Yarn
-RUN yarn install
-
-# Construir los assets de frontend usando Yarn
-RUN yarn build
-
-# Ejecutar migraciones y optimizar la aplicación
-RUN php artisan migrate --force && php artisan optimize
+RUN composer install --no-dev --optimize-autoloader \
+    && echo "Composer install completed" \
+    && npm install \
+    && echo "npm install completed" \
+    && npm run build \
+    && echo "npm run build completed" \
+    && php artisan migrate --force \
+    && echo "Migrations completed" \
+    && php artisan optimize \
+    && echo "Optimize completed" \
+    && chmod 777 -R storage/ \
+    && chmod 777 -R bootstrap/cache \
+    && php artisan storage:link \
+    && echo "Docker build completed"
 
 # Ajustar permisos
-RUN chmod -R 775 storage bootstrap/cache && php artisan storage:link
+RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+RUN chmod -R 775 storage bootstrap/cache
 
 # Exponer el puerto de PHP-FPM
 EXPOSE 9000
