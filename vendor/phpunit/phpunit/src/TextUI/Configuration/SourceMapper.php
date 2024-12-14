@@ -31,6 +31,7 @@ final class SourceMapper
     public function map(Source $source): array
     {
         if (self::$files === null) {
+            /** @phpstan-ignore assign.propertyType */
             self::$files = new SplObjectStorage;
         }
 

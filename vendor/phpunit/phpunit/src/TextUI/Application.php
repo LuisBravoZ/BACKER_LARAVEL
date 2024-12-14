@@ -11,7 +11,6 @@ namespace PHPUnit\TextUI;
 
 use const PHP_EOL;
 use const PHP_VERSION;
-use function assert;
 use function class_exists;
 use function explode;
 use function function_exists;
@@ -54,7 +53,6 @@ use PHPUnit\Runner\ResultCache\ResultCache;
 use PHPUnit\Runner\ResultCache\ResultCacheHandler;
 use PHPUnit\Runner\TestSuiteSorter;
 use PHPUnit\Runner\Version;
-use PHPUnit\TestRunner\IssueFilter;
 use PHPUnit\TestRunner\TestResult\Facade as TestResultFacade;
 use PHPUnit\TextUI\CliArguments\Builder;
 use PHPUnit\TextUI\CliArguments\Configuration as CliConfiguration;
@@ -122,6 +120,14 @@ final readonly class Application
 
             $this->executeCommandsThatDoNotRequireTheTestSuite($configuration, $cliConfiguration);
 
+            $testSuite = $this->buildTestSuite($configuration);
+
+            $this->executeCommandsThatRequireTheTestSuite($configuration, $cliConfiguration, $testSuite);
+
+            if ($testSuite->isEmpty() && !$configuration->hasCliArguments() && $configuration->testSuite()->isEmpty()) {
+                $this->execute(new ShowHelpCommand(Result::FAILURE));
+            }
+
             $pharExtensions                          = null;
             $extensionRequiresCodeCoverageCollection = false;
             $extensionReplacesOutput                 = false;
@@ -142,11 +148,25 @@ final readonly class Application
                 $extensionReplacesResultOutput           = $bootstrappedExtensions['replacesResultOutput'];
             }
 
+            CodeCoverage::instance()->init(
+                $configuration,
+                CodeCoverageFilterRegistry::instance(),
+                $extensionRequiresCodeCoverageCollection,
+            );
+
             $printer = OutputFacade::init(
                 $configuration,
                 $extensionReplacesProgressOutput,
                 $extensionReplacesResultOutput,
             );
+
+            if (!$configuration->debug() && !$extensionReplacesOutput) {
+                $this->writeRuntimeInformation($printer, $configuration);
+                $this->writePharExtensionInformation($printer, $pharExtensions);
+                $this->writeRandomSeedInformation($printer, $configuration);
+
+                $printer->print(PHP_EOL);
+            }
 
             if ($configuration->debug()) {
                 EventFacade::instance()->registerTracer(
@@ -157,12 +177,12 @@ final readonly class Application
                 );
             }
 
-            TestResultFacade::init();
-            DeprecationCollector::init();
-
             $this->registerLogfileWriters($configuration);
 
             $testDoxResultCollector = $this->testDoxResultCollector($configuration);
+
+            TestResultFacade::init();
+            DeprecationCollector::init();
 
             $resultCache = $this->initializeTestResultCache($configuration);
 
@@ -175,31 +195,9 @@ final readonly class Application
 
             $baselineGenerator = $this->configureBaseline($configuration);
 
-            EventFacade::instance()->seal();
-
-            $testSuite = $this->buildTestSuite($configuration);
-
-            $this->executeCommandsThatRequireTheTestSuite($configuration, $cliConfiguration, $testSuite);
-
-            if ($testSuite->isEmpty() && !$configuration->hasCliArguments() && $configuration->testSuite()->isEmpty()) {
-                $this->execute(new ShowHelpCommand(Result::FAILURE));
-            }
-
-            CodeCoverage::instance()->init(
-                $configuration,
-                CodeCoverageFilterRegistry::instance(),
-                $extensionRequiresCodeCoverageCollection,
-            );
-
-            if (!$configuration->debug() && !$extensionReplacesOutput) {
-                $this->writeRuntimeInformation($printer, $configuration);
-                $this->writePharExtensionInformation($printer, $pharExtensions);
-                $this->writeRandomSeedInformation($printer, $configuration);
-
-                $printer->print(PHP_EOL);
-            }
-
             $this->configureDeprecationTriggers($configuration);
+
+            EventFacade::instance()->seal();
 
             $timer = new Timer;
             $timer->start();
@@ -300,41 +298,38 @@ final readonly class Application
 
     private function execute(Command\Command $command, bool $requiresResultCollectedFromEvents = false): never
     {
-        $errored = false;
-
         if ($requiresResultCollectedFromEvents) {
             try {
                 TestResultFacade::init();
                 EventFacade::instance()->seal();
 
                 $resultCollectedFromEvents = TestResultFacade::result();
-
-                $errored = $resultCollectedFromEvents->hasTestTriggeredPhpunitErrorEvents();
             } catch (EventFacadeIsSealedException|UnknownSubscriberTypeException) {
             }
         }
 
         print Version::getVersionString() . PHP_EOL . PHP_EOL;
 
-        if (!$errored) {
-            $result = $command->execute();
+        $result = $command->execute();
 
-            print $result->output();
+        print $result->output();
 
-            exit($result->shellExitCode());
-        }
+        $shellExitCode = $result->shellExitCode();
 
-        assert(isset($resultCollectedFromEvents));
+        if (isset($resultCollectedFromEvents) &&
+            $resultCollectedFromEvents->hasTestTriggeredPhpunitErrorEvents()) {
+            $shellExitCode = Result::EXCEPTION;
 
-        print 'There were errors:' . PHP_EOL;
+            print PHP_EOL . PHP_EOL . 'There were errors:' . PHP_EOL;
 
-        foreach ($resultCollectedFromEvents->testTriggeredPhpunitErrorEvents() as $events) {
-            foreach ($events as $event) {
-                print PHP_EOL . trim($event->message()) . PHP_EOL;
+            foreach ($resultCollectedFromEvents->testTriggeredPhpunitErrorEvents() as $events) {
+                foreach ($events as $event) {
+                    print PHP_EOL . trim($event->message()) . PHP_EOL;
+                }
             }
         }
 
-        exit(Result::EXCEPTION);
+        exit($shellExitCode);
     }
 
     private function loadBootstrapScript(string $filename): void
@@ -475,6 +470,10 @@ final readonly class Application
 
     private function executeCommandsThatDoNotRequireTheTestSuite(Configuration $configuration, CliConfiguration $cliConfiguration): void
     {
+        if ($cliConfiguration->listSuites()) {
+            $this->execute(new ListTestSuitesCommand($configuration->testSuite()));
+        }
+
         if ($cliConfiguration->warmCoverageCache()) {
             $this->execute(new WarmCodeCoverageCacheCommand($configuration, CodeCoverageFilterRegistry::instance()));
         }
@@ -482,10 +481,6 @@ final readonly class Application
 
     private function executeCommandsThatRequireTheTestSuite(Configuration $configuration, CliConfiguration $cliConfiguration, TestSuite $testSuite): void
     {
-        if ($cliConfiguration->listSuites()) {
-            $this->execute(new ListTestSuitesCommand($testSuite));
-        }
-
         if ($cliConfiguration->listGroups()) {
             $this->execute(
                 new ListGroupsCommand(
@@ -677,7 +672,7 @@ final readonly class Application
             $configuration->outputIsTestDox()) {
             return new TestDoxResultCollector(
                 EventFacade::instance(),
-                new IssueFilter($configuration->source()),
+                $configuration->source(),
             );
         }
 

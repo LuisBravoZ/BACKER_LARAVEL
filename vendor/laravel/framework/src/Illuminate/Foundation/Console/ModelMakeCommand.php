@@ -72,8 +72,6 @@ class ModelMakeCommand extends GeneratorCommand
 
         if ($this->option('controller') || $this->option('resource') || $this->option('api')) {
             $this->createController();
-        } elseif ($this->option('requests')) {
-            $this->createFormRequests();
         }
 
         if ($this->option('policy')) {
@@ -151,24 +149,6 @@ class ModelMakeCommand extends GeneratorCommand
     }
 
     /**
-     * Create the form requests for the model.
-     *
-     * @return void
-     */
-    protected function createFormRequests()
-    {
-        $request = Str::studly(class_basename($this->argument('name')));
-
-        $this->call('make:request', [
-            'name' => "Store{$request}Request",
-        ]);
-
-        $this->call('make:request', [
-            'name' => "Update{$request}Request",
-        ]);
-    }
-
-    /**
      * Create a policy file for the model.
      *
      * @return void
@@ -235,7 +215,13 @@ class ModelMakeCommand extends GeneratorCommand
      */
     protected function buildClass($name)
     {
-        $replace = $this->buildFactoryReplacements();
+        $replace = [];
+
+        if ($this->option('factory')) {
+            $replace['{{ factoryDocBlock }}'] = $this->buildFactoryReplacements();
+        } else {
+            $replace["\n    {{ factoryDocBlock }}"] = '';
+        }
 
         return str_replace(
             array_keys($replace), array_values($replace), parent::buildClass($name)
@@ -243,33 +229,17 @@ class ModelMakeCommand extends GeneratorCommand
     }
 
     /**
-     * Build the replacements for a factory.
+     * Build the replacements for a factory DocBlock.
      *
-     * @return array<string, string>
+     * @return string
      */
     protected function buildFactoryReplacements()
     {
-        $replacements = [];
+        $factoryNamespace = '\\Database\\Factories\\'.Str::studly($this->argument('name')).'Factory';
 
-        if ($this->option('factory')) {
-            $modelPath = str($this->argument('name'))->studly()->replace('/', '\\')->toString();
-
-            $factoryNamespace = '\\Database\\Factories\\'.$modelPath.'Factory';
-
-            $factoryCode = <<<EOT
-            /** @use HasFactory<$factoryNamespace> */
-                use HasFactory;
-            EOT;
-
-            $replacements['{{ factory }}'] = $factoryCode;
-            $replacements['{{ factoryImport }}'] = 'use Illuminate\Database\Eloquent\Factories\HasFactory;';
-        } else {
-            $replacements['{{ factory }}'] = '//';
-            $replacements["{{ factoryImport }}\n"] = '';
-            $replacements["{{ factoryImport }}\r\n"] = '';
-        }
-
-        return $replacements;
+        return <<<EOT
+        /** @use HasFactory<$factoryNamespace> */
+        EOT;
     }
 
     /**

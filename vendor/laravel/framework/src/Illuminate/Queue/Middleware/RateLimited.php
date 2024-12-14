@@ -2,12 +2,12 @@
 
 namespace Illuminate\Queue\Middleware;
 
+use BackedEnum;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Cache\RateLimiting\Unlimited;
 use Illuminate\Container\Container;
 use Illuminate\Support\Arr;
-
-use function Illuminate\Support\enum_value;
+use UnitEnum;
 
 class RateLimited
 {
@@ -42,7 +42,11 @@ class RateLimited
     {
         $this->limiter = Container::getInstance()->make(RateLimiter::class);
 
-        $this->limiterName = (string) enum_value($limiterName);
+        $this->limiterName = match (true) {
+            $limiterName instanceof BackedEnum => $limiterName->value,
+            $limiterName instanceof UnitEnum => $limiterName->name,
+            default => (string) $limiterName,
+        };
     }
 
     /**

@@ -36,8 +36,7 @@ final readonly class TestSuiteFilterProcessor
             !$configuration->hasExcludeGroups() &&
             !$configuration->hasExcludeFilter() &&
             !$configuration->hasTestsCovering() &&
-            !$configuration->hasTestsUsing() &&
-            !$configuration->hasTestsRequiringPhpExtension()) {
+            !$configuration->hasTestsUsing()) {
             return;
         }
 
@@ -67,15 +66,6 @@ final readonly class TestSuiteFilterProcessor
                 array_map(
                     static fn (string $name): string => '__phpunit_uses_' . $name,
                     $configuration->testsUsing(),
-                ),
-            );
-        }
-
-        if ($configuration->hasTestsRequiringPhpExtension()) {
-            $factory->addIncludeGroupFilter(
-                array_map(
-                    static fn (string $name): string => '__phpunit_requires_php_extension' . $name,
-                    $configuration->testsRequiringPhpExtension(),
                 ),
             );
         }

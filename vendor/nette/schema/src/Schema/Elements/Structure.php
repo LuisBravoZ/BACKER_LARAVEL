@@ -12,6 +12,7 @@ namespace Nette\Schema\Elements;
 use Nette;
 use Nette\Schema\Context;
 use Nette\Schema\Helpers;
+use Nette\Schema\MergeMode;
 use Nette\Schema\Schema;
 
 
@@ -28,6 +29,7 @@ final class Structure implements Schema
 	/** @var array{?int, ?int} */
 	private array $range = [null, null];
 	private bool $skipDefaults = false;
+	private MergeMode $mergeMode = MergeMode::AppendKeys;
 
 
 	/**
@@ -72,6 +74,13 @@ final class Structure implements Schema
 	public function skipDefaults(bool $state = true): self
 	{
 		$this->skipDefaults = $state;
+		return $this;
+	}
+
+
+	public function mergeMode(MergeMode $mode): self
+	{
+		$this->mergeMode = $mode;
 		return $this;
 	}
 
@@ -124,13 +133,13 @@ final class Structure implements Schema
 
 	public function merge(mixed $value, mixed $base): mixed
 	{
-		if (is_array($value) && isset($value[Helpers::PreventMerging])) {
+		if ($this->mergeMode === MergeMode::Replace || (is_array($value) && isset($value[Helpers::PreventMerging]))) {
 			unset($value[Helpers::PreventMerging]);
 			$base = null;
 		}
 
 		if (is_array($value) && is_array($base)) {
-			$index = $this->otherItems === null ? null : 0;
+			$index = $this->mergeMode === MergeMode::OverwriteKeys ? null : 0;
 			foreach ($value as $key => $val) {
 				if ($key === $index) {
 					$base[] = $val;

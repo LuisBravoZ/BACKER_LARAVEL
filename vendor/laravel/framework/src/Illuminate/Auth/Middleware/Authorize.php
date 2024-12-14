@@ -2,11 +2,10 @@
 
 namespace Illuminate\Auth\Middleware;
 
+use BackedEnum;
 use Closure;
 use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Database\Eloquent\Model;
-
-use function Illuminate\Support\enum_value;
 
 class Authorize
 {
@@ -37,7 +36,9 @@ class Authorize
      */
     public static function using($ability, ...$models)
     {
-        return static::class.':'.implode(',', [enum_value($ability), ...$models]);
+        $ability = $ability instanceof BackedEnum ? $ability->value : $ability;
+
+        return static::class.':'.implode(',', [$ability, ...$models]);
     }
 
     /**

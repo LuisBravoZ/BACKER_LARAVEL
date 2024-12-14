@@ -29,8 +29,6 @@ use LogicException;
 use RuntimeException;
 use UnitEnum;
 
-use function Illuminate\Support\enum_value;
-
 class Builder implements BuilderContract
 {
     /** @use \Illuminate\Database\Concerns\BuildsQueries<object> */
@@ -144,7 +142,7 @@ class Builder implements BuilderContract
     /**
      * The orderings for the query.
      *
-     * @var array|null
+     * @var array
      */
     public $orders;
 
@@ -193,7 +191,7 @@ class Builder implements BuilderContract
     /**
      * The orderings for the union query.
      *
-     * @var array|null
+     * @var array
      */
     public $unionOrders;
 
@@ -768,7 +766,7 @@ class Builder implements BuilderContract
      *
      * @param  \Illuminate\Database\Query\Builder  $parentQuery
      * @param  string  $type
-     * @param  \Illuminate\Contracts\Database\Query\Expression|string  $table
+     * @param  string  $table
      * @return \Illuminate\Database\Query\JoinClause
      */
     protected function newJoinClause(self $parentQuery, $type, $table)
@@ -781,7 +779,7 @@ class Builder implements BuilderContract
      *
      * @param  \Illuminate\Database\Query\Builder  $parentQuery
      * @param  string  $type
-     * @param  \Illuminate\Contracts\Database\Query\Expression|string  $table
+     * @param  string  $table
      * @return \Illuminate\Database\Query\JoinLateralClause
      */
     protected function newJoinLateralClause(self $parentQuery, $type, $table)
@@ -926,7 +924,7 @@ class Builder implements BuilderContract
         return $this->whereNested(function ($query) use ($column, $method, $boolean) {
             foreach ($column as $key => $value) {
                 if (is_numeric($key) && is_array($value)) {
-                    $query->{$method}(...array_values($value), boolean: $boolean);
+                    $query->{$method}(...array_values($value));
                 } else {
                     $query->{$method}($key, '=', $value, $boolean);
                 }
@@ -4210,7 +4208,7 @@ class Builder implements BuilderContract
     public function castBinding($value)
     {
         if ($value instanceof UnitEnum) {
-            return enum_value($value);
+            return $value instanceof BackedEnum ? $value->value : $value->name;
         }
 
         return $value;

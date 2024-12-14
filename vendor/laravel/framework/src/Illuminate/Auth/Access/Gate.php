@@ -2,6 +2,7 @@
 
 namespace Illuminate\Auth\Access;
 
+use BackedEnum;
 use Closure;
 use Exception;
 use Illuminate\Auth\Access\Events\GateEvaluated;
@@ -14,8 +15,6 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use ReflectionClass;
 use ReflectionFunction;
-
-use function Illuminate\Support\enum_value;
 
 class Gate implements GateContract
 {
@@ -201,7 +200,7 @@ class Gate implements GateContract
      */
     public function define($ability, $callback)
     {
-        $ability = enum_value($ability);
+        $ability = $ability instanceof BackedEnum ? $ability->value : $ability;
 
         if (is_array($callback) && isset($callback[0]) && is_string($callback[0])) {
             $callback = $callback[0].'@'.$callback[1];
@@ -406,8 +405,10 @@ class Gate implements GateContract
      */
     public function inspect($ability, $arguments = [])
     {
+        $ability = $ability instanceof BackedEnum ? $ability->value : $ability;
+
         try {
-            $result = $this->raw(enum_value($ability), $arguments);
+            $result = $this->raw($ability, $arguments);
 
             if ($result instanceof Response) {
                 return $result;

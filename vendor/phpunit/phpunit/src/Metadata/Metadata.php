@@ -10,7 +10,6 @@
 namespace PHPUnit\Metadata;
 
 use PHPUnit\Metadata\Version\Requirement;
-use PHPUnit\Runner\Extension\Extension;
 
 /**
  * @immutable
@@ -389,22 +388,6 @@ abstract readonly class Metadata
     public static function requiresPhpunitOnMethod(Requirement $versionRequirement): RequiresPhpunit
     {
         return new RequiresPhpunit(self::METHOD_LEVEL, $versionRequirement);
-    }
-
-    /**
-     * @param class-string<Extension> $extensionClass
-     */
-    public static function requiresPhpunitExtensionOnClass(string $extensionClass): RequiresPhpunitExtension
-    {
-        return new RequiresPhpunitExtension(self::CLASS_LEVEL, $extensionClass);
-    }
-
-    /**
-     * @param class-string<Extension> $extensionClass
-     */
-    public static function requiresPhpunitExtensionOnMethod(string $extensionClass): RequiresPhpunitExtension
-    {
-        return new RequiresPhpunitExtension(self::METHOD_LEVEL, $extensionClass);
     }
 
     /**
@@ -844,14 +827,6 @@ abstract readonly class Metadata
      * @phpstan-assert-if-true RequiresPhpunit $this
      */
     public function isRequiresPhpunit(): bool
-    {
-        return false;
-    }
-
-    /**
-     * @phpstan-assert-if-true RequiresPhpunitExtension $this
-     */
-    public function isRequiresPhpunitExtension(): bool
     {
         return false;
     }
